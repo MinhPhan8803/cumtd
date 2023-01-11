@@ -69,35 +69,39 @@ struct GetStopsResponse {
     stops: Vec<Stop>,
 }
 
-pub async fn stops_query_api(key: String, query_type: &StopsQueryType) -> Result<Vec<Stop>, Box<dyn Error>> {
+pub async fn stops_query_api(key: &str, query_type: &StopsQueryType) -> Result<Vec<Stop>, Box<dyn Error>> {
     let client = Client::builder().build()?;
     let request = match query_type {
         StopsQueryType::ById(ids) => {
             let key_query = ids.join(";");
             client
             .get("https://developer.cumtd.com/api/v2.2/json/getstop")
-            .query(&[("key", key.as_str()), ("stop_id", key_query.as_str())])
-            .send().await
+            .query(&[("key", key), ("stop_id", &key_query)])
+            .send()
+            .await
         },
         StopsQueryType::All => {
             client
             .get("https://developer.cumtd.com/api/v2.2/json/getstops")
-            .query(&[("key", key.as_str())])
-            .send().await
+            .query(&[("key", key)])
+            .send()
+            .await
         },
         StopsQueryType::ByLatLon(latlon) => {
+            let builder= client
+            .get("https://developer.cumtd.com/api/v2.2/json/getstopsbylatlon")
+            .query(&[("key", key), ("lat", &latlon.lat.to_string()), ("lon", &latlon.lon.to_string())]);
             match latlon.count {
                 Some(x) => {
-                    client
-                    .get("https://developer.cumtd.com/api/v2.2/json/getstopsbylatlon")
-                    .query(&[("key", key.as_str()), ("lat", latlon.lat.to_string().as_str()), ("lon", latlon.lon.to_string().as_str()), ("count", x.to_string().as_str())])
-                    .send().await
+                    builder
+                    .query(&[("count", x.to_string().as_str())])
+                    .send()
+                    .await
                 }
                 None => {
-                    client
-                    .get("https://developer.cumtd.com/api/v2.2/json/getstopsbylatlon")
-                    .query(&[("key", key.as_str()), ("lat", latlon.lat.to_string().as_str()), ("lon", latlon.lon.to_string().as_str())])
-                    .send().await
+                    builder
+                    .send()
+                    .await
                 }
             }
         },

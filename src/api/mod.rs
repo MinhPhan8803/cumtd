@@ -1,6 +1,6 @@
 pub mod departures;
 pub mod routes;
-pub mod shape;
+pub mod shapes;
 pub mod stops;
 pub mod trips;
 pub mod vehicles;
