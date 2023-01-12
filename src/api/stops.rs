@@ -1,5 +1,6 @@
 //use std::collections::HashMap;
-use std::{fmt::Display, error::Error};
+use crate::Error;
+use std::fmt::Display;
 //use std::path::Path;
 use serde::Deserialize;
 use reqwest::Client;
@@ -63,7 +64,7 @@ struct GetStopsResponse {
     stops: Vec<StopProt>,
 }
 
-pub async fn stops_query_api(key: &str, query_type: &StopsQueryType) -> Result<Vec<Stop>, Box<dyn Error>> {
+pub async fn stops_query_api(key: &str, query_type: &StopsQueryType) -> Result<Vec<Stop>, Error> {
     let client = Client::builder().build()?;
     let request = match query_type {
         StopsQueryType::ById(ids) => {

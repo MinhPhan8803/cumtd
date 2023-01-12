@@ -1,4 +1,4 @@
-use std::error::Error;
+use crate::Error;
 use serde::Deserialize;
 use reqwest::Client;
 
@@ -40,7 +40,7 @@ pub enum ShapesQueryType {
     BetweenStops(ShapeSpecifier),
 }
 
-pub async fn shapes_query_api(key: &str, query_type: &ShapesQueryType) -> Result<Vec<Shape>, Box<dyn Error>> {
+pub async fn shapes_query_api(key: &str, query_type: &ShapesQueryType) -> Result<Vec<Shape>, Error> {
     let client = Client::builder().build()?;
     let request = match query_type {
         ShapesQueryType::FullShape(id) => {

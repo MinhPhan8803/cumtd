@@ -1,7 +1,7 @@
-use std::error::Error;
+use crate::Error;
 use time::Date;
 use time::format_description::well_known::Iso8601;
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, de};
 use reqwest::Client;
 
 #[derive(Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -23,11 +23,12 @@ impl CalendarDate {
 fn deserialize_to_date<'de, D>(deserializer: D) -> Result<Date, D::Error>
 where D: Deserializer<'de> {
     let buf = Deserialize::deserialize(deserializer)?;
-    // let date = Date::parse(buf, &Iso8601::DEFAULT);
-    // if date.is_err() {
-    //     return <dyn Deserializer<Error = D::Error>>;
-    // }
-    Ok(Date::parse(buf, &Iso8601::DEFAULT).unwrap())
+    let date = Date::parse(buf, &Iso8601::DEFAULT);
+    if date.is_err() {
+        return Err("failed to deserialize a date")
+        .map_err(de::Error::custom);
+    }
+    Ok(date.unwrap())
 }
 
 #[derive(Deserialize, Debug)]
@@ -40,11 +41,11 @@ pub enum DatesQueryType {
     ByService(String),
 }
 
-pub async fn dates_query_api(key: &str, query_type: &DatesQueryType) -> Result<Vec<CalendarDate>, Box<dyn Error>> {
+pub async fn dates_query_api(key: &str, query_type: &DatesQueryType) -> Result<Vec<CalendarDate>, Error> {
     let client = Client::builder().build()?;
     let request = match query_type {
         DatesQueryType::ByDate(date) => {
-            let date_string = date.format(&Iso8601::DEFAULT).unwrap();
+            let date_string = date.format(&Iso8601::DEFAULT)?;
             client
             .get("https://developer.cumtd.com/api/v2.2/json/getcalendardatesbydate")
             .query(&[("key", key), ("date", &date_string)])
@@ -53,7 +54,7 @@ pub async fn dates_query_api(key: &str, query_type: &DatesQueryType) -> Result<V
         },
         DatesQueryType::ByService(id) => {
             client
-            .get("https://developer.cumtd.com/api/v2.2/json/getcalendardatesbydate")
+            .get("https://developer.cumtd.com/api/v2.2/json/getcalendardatesbyservice")
             .query(&[("key", key), ("service_id", id)])
             .send()
             .await

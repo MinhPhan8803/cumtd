@@ -1,4 +1,4 @@
-use std::error::Error;
+use crate::Error;
 //use std::path::Path;
 use serde::Deserialize;
 use reqwest::Client;
@@ -43,7 +43,7 @@ pub enum RoutesQueryType {
     ByStop(String),
 }
 
-pub async fn routes_query_api(key: &str, query_type: &RoutesQueryType) -> Result<Vec<Route>, Box<dyn Error>> {
+pub async fn routes_query_api(key: &str, query_type: &RoutesQueryType) -> Result<Vec<Route>, Error> {
     let client = Client::builder().build()?;
     let request = match query_type {
         RoutesQueryType::ById(ids) => {
