@@ -9,14 +9,14 @@ pub fn add(left: usize, right: usize) -> usize {
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Unable to create an HTTP client")]
+    #[error("Create HTTP client failed: {0}")]
     ClientError(String),
-    #[error("Error occurred during a request")]
+    #[error("Request failed: {0}")]
     RequestError(String),
-    #[error("Deserializing reponse failed with the following error: {0}")]
+    #[error("Deserializing reponse failed: {0}")]
     DeserializeError(String),
     #[error("Unable to format an input date string")]
-    FormatDateError(String),
+    FormatDateError(#[from] time::error::Format),
 }
 
 impl From<reqwest::Error> for Error {
@@ -35,12 +35,6 @@ impl From<reqwest::Error> for Error {
 impl de::Error for Error {
     fn custom<T>(msg: T) -> Self where T:std::fmt::Display {
         Error::DeserializeError(msg.to_string())
-    }
-}
-
-impl From<time::error::Format> for Error {
-    fn from(value: time::error::Format) -> Self {
-        Error::FormatDateError(value.to_string())
     }
 }
 
