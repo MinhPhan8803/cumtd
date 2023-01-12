@@ -1,44 +1,32 @@
-use std::collections::HashMap;
+//use std::collections::HashMap;
 use std::{fmt::Display, error::Error};
-use std::path::Path;
+//use std::path::Path;
 use serde::Deserialize;
 use reqwest::Client;
-use csv::Reader;
+//use csv::Reader;
 
-#[derive(Deserialize, Debug, Clone, Eq, PartialEq)]
-pub struct Stop {
+#[derive(Deserialize, Debug)]
+struct StopProt {
     stop_id: String,
     stop_name: String,
-    code: String,
-    stop_points: Vec<StopPoint>,
-}
-
-impl Stop {
-    pub fn id(&self) -> &str {
-        &self.stop_id
-    }
-    pub fn name(&self) -> &str {
-        &self.stop_name
-    }
-    pub fn code(&self) -> &str {
-        &self.code
-    }
-    pub fn stop_points(&self) -> &[StopPoint] {
-        &self.stop_points
-    }
+    stop_points: Vec<Stop>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct StopPoint {
+pub struct Stop {
     #[serde(alias = "stop_code")]
     code: String,
     stop_id: String,
     stop_lat: f64,
     stop_lon: f64,
     stop_name: String,
+    #[serde(skip_deserializing)]
+    location_id: String,
+    #[serde(skip_deserializing)]
+    location_name: String,
 }
 
-impl StopPoint {
+impl Stop {
     pub fn code(&self) -> &str {
         &self.code
     }
@@ -54,11 +42,17 @@ impl StopPoint {
     pub fn lon(&self) -> f64 {
         self.stop_lon
     }
+    pub fn location_id(&self) -> &str {
+        &self.location_id
+    }
+    pub fn location_name(&self) -> &str {
+        &self.location_name
+    }
 }
 
-impl Eq for StopPoint {}
+impl Eq for Stop {}
 
-impl PartialEq for StopPoint {
+impl PartialEq for Stop {
     fn eq(&self, other: &Self) -> bool {
         self.stop_id == other.stop_id
     }
@@ -66,7 +60,7 @@ impl PartialEq for StopPoint {
 
 #[derive(Deserialize, Debug)]
 struct GetStopsResponse {
-    stops: Vec<Stop>,
+    stops: Vec<StopProt>,
 }
 
 pub async fn stops_query_api(key: &str, query_type: &StopsQueryType) -> Result<Vec<Stop>, Box<dyn Error>> {
@@ -106,49 +100,58 @@ pub async fn stops_query_api(key: &str, query_type: &StopsQueryType) -> Result<V
             }
         },
     };
-    let json = request?.json::<GetStopsResponse>().await?;
-    Ok(json.stops)
-}
-
-pub async fn stops_query_gtfs<P: AsRef<Path>>(query_type: &StopsQueryType, path: P) -> Result<Vec<Stop>, Box<dyn Error>> {
-    let mut reader = Reader::from_path(path)?;
-    let read_result = reader.deserialize::<StopPoint>();
-    let serde_result: Result<Vec<StopPoint>, _> = match query_type {
-        StopsQueryType::ById(id) => {
-            read_result
-            .filter(| single_res | single_res.is_err() || 
-            id.contains(&single_res.as_ref().unwrap().stop_id))
-            .collect()
-        },
-        StopsQueryType::All => {
-            read_result
-            .collect()
-        },
-        StopsQueryType::ByLatLon(latlon) => {
-            read_result
-            .filter(| single_res | single_res.is_err() || 
-            (latlon.lat == single_res.as_ref().unwrap().stop_lat 
-            && latlon.lon == single_res.as_ref().unwrap().stop_lon))
-            .collect()
+    let mut json = request?.json::<GetStopsResponse>().await?;
+    for stop_prot in &mut json.stops {
+        for mut stop in &mut stop_prot.stop_points {
+            stop.location_id = stop_prot.stop_id.clone();
+            stop.location_name = stop_prot.stop_name.clone();
         }
-    };
-    let mut points_map: HashMap<String, Vec<StopPoint>> = HashMap::new();
-    for point in serde_result? {
-        match points_map.get_mut(&point.code) {
-            Some(x) => x.push(point),
-            None => {points_map.insert(point.code.clone(), vec!(point)); ()},
-        };
     }
-    Ok(points_map
+    Ok(json.stops
     .into_iter()
-    .map(|(key, val)| Stop {
-        stop_id: val[0].stop_id.split(":").next().unwrap().to_string(),
-        stop_name: val[0].stop_name.split(" (").next().unwrap().to_string(),
-        code: key,
-        stop_points: val,
-    })
+    .flat_map(|prot| prot.stop_points)
     .collect())
 }
+
+// pub async fn stops_query_gtfs<P: AsRef<Path>>(query_type: &StopsQueryType, path: P) -> Result<Vec<Stop>, Box<dyn Error>> {
+//     let mut reader = Reader::from_path(path)?;
+//     let read_result = reader.deserialize::<StopPoint>();
+//     let serde_result: Result<Vec<StopPoint>, _> = match query_type {
+//         StopsQueryType::ById(id) => {
+//             read_result
+//             .filter(| single_res | single_res.is_err() || 
+//             id.contains(&single_res.as_ref().unwrap().stop_id))
+//             .collect()
+//         },
+//         StopsQueryType::All => {
+//             read_result
+//             .collect()
+//         },
+//         StopsQueryType::ByLatLon(latlon) => {
+//             read_result
+//             .filter(| single_res | single_res.is_err() || 
+//             (latlon.lat == single_res.as_ref().unwrap().stop_lat 
+//             && latlon.lon == single_res.as_ref().unwrap().stop_lon))
+//             .collect()
+//         }
+//     };
+//     let mut points_map: HashMap<String, Vec<StopPoint>> = HashMap::new();
+//     for point in serde_result? {
+//         match points_map.get_mut(&point.code) {
+//             Some(x) => x.push(point),
+//             None => {points_map.insert(point.code.clone(), vec!(point)); ()},
+//         };
+//     }
+//     Ok(points_map
+//     .into_iter()
+//     .map(|(key, val)| Stop {
+//         stop_id: val[0].stop_id.split(":").next().unwrap().to_string(),
+//         stop_name: val[0].stop_name.split(" (").next().unwrap().to_string(),
+//         code: key,
+//         stop_points: val,
+//     })
+//     .collect())
+// }
 
 #[derive(Debug, Clone)]
 pub enum StopsQueryType {
